@@ -1,6 +1,7 @@
 package com.mygdx.game.dialogue;
 
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
@@ -23,14 +24,19 @@ public class DialogueBox {
     private int charIndex = 0;
     private static final float CHAR_INTERVAL = 0.03f; // seconds per character
 
+    private Texture faceTexture;
+    private static final float FACE_SIZE = 512;
+    private static final float FACE_PADDING = -100;
+
     public DialogueBox() {
         font = new BitmapFont();
         shapeRenderer = new ShapeRenderer();
-        height = 65;
+        height = 100; // increased to make space for face
     }
 
-    public void startTyping(DialogueLine line) {
+    public void startTyping(DialogueLine line, Texture faceTexture) {
         this.currentLine = line;
+        this.faceTexture = faceTexture;
         this.visible = true;
         this.typing = true;
         this.displayedText = new StringBuilder();
@@ -54,6 +60,7 @@ public class DialogueBox {
         this.typing = false;
         this.displayedText = new StringBuilder();
         this.charIndex = 0;
+        this.faceTexture = null;
     }
 
     public boolean isVisible() {
@@ -89,14 +96,22 @@ public class DialogueBox {
 
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
-        // Resume batch to draw text
+        // Resume batch to draw text and face
         batch.begin();
+        if (faceTexture != null) {
+            batch.draw(faceTexture, X + FACE_PADDING, Y, FACE_SIZE, FACE_SIZE);
+        }
+
+        float textX = X + FACE_SIZE + 2 * FACE_PADDING;
         font.setColor(Color.WHITE);
-        font.draw(batch, currentLine.speaker() + ": " + displayedText.toString(), X + 20, Y + 230);
+        font.draw(batch, currentLine.speaker() + ": " + displayedText.toString(), textX, Y + 230);
     }
 
     public void dispose() {
         font.dispose();
         shapeRenderer.dispose();
+        if (faceTexture != null) {
+            faceTexture.dispose();
+        }
     }
 }

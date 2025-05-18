@@ -23,6 +23,8 @@ public class Simple2DGame extends ApplicationAdapter {
     private Texture characterSheet;
     private Texture bgTexture;
     private Texture groundTexture;
+    private Texture npcFaceTexture;
+    private Texture characterFaceTexture;
 
     private Animation<TextureRegion> walkLeftAnim;
     private Animation<TextureRegion> walkRightAnim;
@@ -67,6 +69,8 @@ public class Simple2DGame extends ApplicationAdapter {
             new DialogueLine("Character", "Oh yeah, now I know all about that!")
         };
 
+        npcFaceTexture = new Texture("npc_face.png");
+        characterFaceTexture = new Texture("character_face.png");
         characterSheet = new Texture("character_walk.png");
         bgTexture = new Texture("bg.png");
         groundTexture = new Texture("ground.png");
@@ -248,7 +252,8 @@ public class Simple2DGame extends ApplicationAdapter {
             if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
                 inDialogue = true;
                 currentDialogueIndex = 0;
-                dialogueBox.startTyping(conversation[currentDialogueIndex]);
+                Texture texture = conversation[currentDialogueIndex].speaker().equals("NPC") ? npcFaceTexture : characterFaceTexture;
+                dialogueBox.startTyping(conversation[currentDialogueIndex], texture);
             }
         } else if (inDialogue && Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
             if (dialogueBox.isTyping()) {
@@ -259,7 +264,8 @@ public class Simple2DGame extends ApplicationAdapter {
                     dialogueBox.hide();
                     inDialogue = false;
                 } else {
-                    dialogueBox.startTyping(conversation[currentDialogueIndex]);
+                    Texture texture = conversation[currentDialogueIndex].speaker().equals("NPC") ? npcFaceTexture : characterFaceTexture;
+                    dialogueBox.startTyping(conversation[currentDialogueIndex], texture);
                 }
             }
         }
