@@ -221,7 +221,7 @@ public class Simple2DGame extends ApplicationAdapter {
         shapeRenderer.rect(characterCollider.x, characterCollider.y, characterCollider.width, characterCollider.height);
         shapeRenderer.setColor(0, 1, 0, 1); // Green - ground
         shapeRenderer.rect(groundCollider.x, groundCollider.y, groundCollider.width, groundCollider.height);
-        shapeRenderer.setColor(0, 0, 1, 1);
+        shapeRenderer.setColor(0, 0, 1, 1); // Blue - NPC
         shapeRenderer.rect(npc.getCollider().x, npc.getCollider().y, npc.getCollider().width, npc.getCollider().height);
         shapeRenderer.end();
     }
@@ -248,15 +248,19 @@ public class Simple2DGame extends ApplicationAdapter {
             if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
                 inDialogue = true;
                 currentDialogueIndex = 0;
-                dialogueBox.show(conversation[currentDialogueIndex]);
+                dialogueBox.startTyping(conversation[currentDialogueIndex]);
             }
         } else if (inDialogue && Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
-            currentDialogueIndex++;
-            if (currentDialogueIndex >= conversation.length) {
-                dialogueBox.hide();
-                inDialogue = false;
+            if (dialogueBox.isTyping()) {
+                dialogueBox.skipTyping();
             } else {
-                dialogueBox.show(conversation[currentDialogueIndex]);
+                currentDialogueIndex++;
+                if (currentDialogueIndex >= conversation.length) {
+                    dialogueBox.hide();
+                    inDialogue = false;
+                } else {
+                    dialogueBox.startTyping(conversation[currentDialogueIndex]);
+                }
             }
         }
     }
