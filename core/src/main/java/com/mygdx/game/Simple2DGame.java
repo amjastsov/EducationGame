@@ -13,8 +13,10 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
+import com.mygdx.game.cutscene.Cutscene;
 import com.mygdx.game.dialogue.DialogueBox;
 import com.mygdx.game.dialogue.DialogueLine;
+import com.mygdx.game.gamestate.GameState;
 import com.mygdx.game.npc.NPC;
 
 public class Simple2DGame extends ApplicationAdapter {
@@ -56,6 +58,12 @@ public class Simple2DGame extends ApplicationAdapter {
     private static final float CHARACTER_HEIGHT = 150f;
     private static final String PRESS_SPACE_TO_TALK = "Press SPACE to talk";
 
+    private Cutscene cutscene;
+    private boolean cutsceneFinished = false;
+    private float cutsceneZoomSpeed = 0.5f;
+    private GameState gameState = GameState.MENU;
+    private MainMenu mainMenu;
+
     @Override
     public void create() {
         batch = new SpriteBatch();
@@ -90,15 +98,58 @@ public class Simple2DGame extends ApplicationAdapter {
 
         camera = new OrthographicCamera(SCREEN_WIDTH, SCREEN_HEIGHT);
         camera.position.set(640, 360, 0);
+        camera.setToOrtho(false, 1280, 720);
         camera.update();
 
         characterCollider = new Rectangle(characterPosition.x, characterPosition.y, 50, 130);
         groundCollider = new Rectangle(0, 0, SCREEN_WIDTH, 25);
+        cutscene = new Cutscene(characterPosition, npc.getCollider(), camera);
+        mainMenu = new MainMenu();
     }
 
     @Override
     public void render() {
-        handleInput();
+        Gdx.gl.glClearColor(0, 0, 0, 1);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
+        if (gameState == GameState.MENU) {
+            mainMenu.update(camera);
+            mainMenu.render(batch, shapeRenderer, camera);
+
+            if (mainMenu.isPlayPressed()) {
+                gameState = GameState.GAME;
+            }
+
+            return;
+        }
+
+        float delta = Gdx.graphics.getDeltaTime();
+        stateTime += delta;
+
+        if (!cutsceneFinished) {
+            cutscene.update(delta);
+            moving = cutscene.isMoving();
+            facingLeft = cutscene.isFacingLeft();
+            if (cutscene.isFinished()) {
+                cutsceneFinished = true;
+            }
+        } else {
+            handleInput();
+        }
+
+
+
+        camera.update();
+        batch.setProjectionMatrix(camera.combined);
+
+        characterCollider.setPosition(characterPosition.x + 50, characterPosition.y - 40);
+
+        if (cutsceneFinished && camera.zoom != 1f) {
+            camera.zoom += cutsceneZoomSpeed * Gdx.graphics.getDeltaTime();
+            if (camera.zoom > 1f) {
+                camera.zoom = 1f;
+            }
+        }
 
         stateTime += Gdx.graphics.getDeltaTime();
         Gdx.gl.glClearColor(0, 0, 0, 1);
@@ -162,7 +213,7 @@ public class Simple2DGame extends ApplicationAdapter {
      * @return true if the above conditions are met, indicating that dialogue can start; false otherwise.
      */
     private boolean canStartDialogue() {
-        return npc.getCollider().overlaps(characterCollider) && !inDialogue && !dialogueBox.isVisible();
+        return npc.getCollider().overlaps(characterCollider) && !inDialogue && !dialogueBox.isVisible() && cutsceneFinished;
     }
 
     /**
