@@ -1,74 +1,79 @@
 package com.mygdx.game;
 
-import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.audio.Music;
+import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
-import com.badlogic.gdx.math.Rectangle;
-import com.badlogic.gdx.math.Vector2;
+
+import com.mygdx.game.npc.NPC;
+import com.mygdx.game.npc.Lightning;
 import com.mygdx.game.cutscene.Cutscene;
+import com.mygdx.game.gamestate.GameState;
 import com.mygdx.game.dialogue.DialogueBox;
 import com.mygdx.game.dialogue.DialogueLine;
-import com.mygdx.game.gamestate.GameState;
-import com.mygdx.game.npc.NPC;
 
 public class Simple2DGame extends ApplicationAdapter {
+
+    private Vector2 characterPosition;
+    private Rectangle characterCollider;
+    private Rectangle groundCollider;
+    private BitmapFont font;
     private SpriteBatch batch;
     private ShapeRenderer shapeRenderer;
+    private OrthographicCamera camera;
+    private Music electricSound;
     private Texture characterSheet;
     private Texture bgTexture;
     private Texture groundTexture;
     private Texture npcFaceTexture;
     private Texture characterFaceTexture;
-
-    private Animation<TextureRegion> walkLeftAnim;
-    private Animation<TextureRegion> walkRightAnim;
+    private Texture lightningTexture;
     private TextureRegion idleLeft;
     private TextureRegion idleRight;
-
-    private float stateTime;
-    private BitmapFont font;
-    private boolean facingLeft = true;
-    private boolean moving = false;
-
-    private OrthographicCamera camera;
-    private Vector2 characterPosition;
-
-    private Rectangle characterCollider;
-    private Rectangle groundCollider;
+    private Animation<TextureRegion> walkLeftAnim;
+    private Animation<TextureRegion> walkRightAnim;
 
     private NPC npc;
+    private Cutscene cutscene;
+    private MainMenu mainMenu;
+    private GameState gameState = GameState.MENU;
+    private Lightning lightning;
     private DialogueBox dialogueBox;
     private DialogueLine[] conversation;
-    private int currentDialogueIndex = 0;
-    private boolean inDialogue = false;
 
+    private boolean moving = false;
+    private boolean facingLeft = true;
+    private boolean inDialogue = false;
+    private boolean cutsceneFinished = false;
+
+    private float stateTime;
+    private float lightningCooldown = 0f;
+    private int currentDialogueIndex = 0;
+
+    private static final float SPEED = 150f;
     private static final float SCREEN_WIDTH = 1280f;
     private static final float SCREEN_HEIGHT = 720f;
     private static final float FRAME_DURATION = 0.1f;
-    private static final float SPEED = 150f;
     private static final float CHARACTER_WIDTH = 150f;
     private static final float CHARACTER_HEIGHT = 150f;
+    private static final float CUTSCENE_ZOOM_SPEED = 0.5f;
     private static final String PRESS_SPACE_TO_TALK = "Press SPACE to talk";
 
-    private Cutscene cutscene;
-    private boolean cutsceneFinished = false;
-    private float cutsceneZoomSpeed = 0.5f;
-    private GameState gameState = GameState.MENU;
-    private MainMenu mainMenu;
 
     @Override
     public void create() {
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
-
         npc = new NPC(600, 30);
         dialogueBox = new DialogueBox();
         font = new BitmapFont();
@@ -76,56 +81,95 @@ public class Simple2DGame extends ApplicationAdapter {
             new DialogueLine("NPC", "Hello, do you know how to make dialogues with LIBGDX?"),
             new DialogueLine("Character", "Oh yeah, now I know all about that!")
         };
-
         npcFaceTexture = new Texture("npc_face.png");
         characterFaceTexture = new Texture("character_face.png");
         characterSheet = new Texture("character_walk.png");
         bgTexture = new Texture("bg.png");
         groundTexture = new Texture("ground.png");
+        lightningTexture = new Texture("lightning.png");
+        groundCollider = new Rectangle(0, 0, SCREEN_WIDTH, 25);
+        mainMenu = new MainMenu();
+        lightning = new Lightning(lightningTexture, 900, 70);
+        characterPosition = new Vector2(300, 64);
+        characterCollider = new Rectangle(characterPosition.x, characterPosition.y, 50, 130);
+        TextureRegion[][] tmp = TextureRegion.split(characterSheet, 512, 512);
+        walkLeftAnim = new Animation<>(FRAME_DURATION, tmp[0]);
+        walkRightAnim = new Animation<>(FRAME_DURATION, tmp[1]);
+        camera = new OrthographicCamera(SCREEN_WIDTH, SCREEN_HEIGHT);
+        electricSound = Gdx.audio.newMusic(Gdx.files.internal("electric-sound.mp3"));
 
         characterSheet.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         bgTexture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         groundTexture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
 
-        TextureRegion[][] tmp = TextureRegion.split(characterSheet, 512, 512);
-        walkLeftAnim = new Animation<>(FRAME_DURATION, tmp[0]);
-        walkRightAnim = new Animation<>(FRAME_DURATION, tmp[1]);
-        idleLeft = tmp[0][0];
-        idleRight = tmp[1][0];
-
-        stateTime = 0f;
-        characterPosition = new Vector2(300, 64);
-
-        camera = new OrthographicCamera(SCREEN_WIDTH, SCREEN_HEIGHT);
         camera.position.set(640, 360, 0);
         camera.setToOrtho(false, 1280, 720);
         camera.update();
 
-        characterCollider = new Rectangle(characterPosition.x, characterPosition.y, 50, 130);
-        groundCollider = new Rectangle(0, 0, SCREEN_WIDTH, 25);
         cutscene = new Cutscene(characterPosition, npc.getCollider(), camera);
-        mainMenu = new MainMenu();
+
+        electricSound.setLooping(true);
+        electricSound.setVolume(0.3f);
+
+        idleLeft = tmp[0][0];
+        idleRight = tmp[1][0];
+
+        stateTime = 0f;
     }
 
     @Override
     public void render() {
-        Gdx.gl.glClearColor(0, 0, 0, 1);
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+        clearScreen();
 
-        if (gameState == GameState.MENU) {
-            mainMenu.update(camera);
-            mainMenu.render(batch, shapeRenderer, camera);
-
-            if (mainMenu.isPlayPressed()) {
-                gameState = GameState.GAME;
-            }
-
-            return;
-        }
+        if (handleMenuState()) return;
 
         float delta = Gdx.graphics.getDeltaTime();
         stateTime += delta;
 
+        updateCutsceneOrInput(delta);
+        updateCameraZoomIfNeeded(delta);
+        updateCharacterCollider();
+        renderGame();
+        updateLightningLogic(delta);
+        // show colliders for debugging
+//        showColliders();
+    }
+
+    /**
+     * Clears the screen by resetting the current framebuffer to a blank state.
+     */
+    private void clearScreen() {
+        Gdx.gl.glClearColor(0, 0, 0, 1);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+    }
+
+    /**
+     * Handles the game state when the game is in the MENU state. Updates
+     * and renders the main menu and transitions to the GAME state if
+     * the play button is pressed.
+     *
+     * @return true if the game state is MENU and the menu is handled; false otherwise.
+     */
+    private boolean handleMenuState() {
+        if (gameState == GameState.MENU) {
+            mainMenu.update(camera);
+            mainMenu.render(batch, shapeRenderer, camera);
+            if (mainMenu.isPlayPressed()) {
+                gameState = GameState.GAME;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Updates the game logic by either progressing through a cutscene or handling user input
+     * depending on the current state of the cutscene.
+     *
+     * @param delta the time elapsed since the last frame, used for updating the cutscene
+     *              or handling time-sensitive input.
+     */
+    private void updateCutsceneOrInput(float delta) {
         if (!cutsceneFinished) {
             cutscene.update(delta);
             moving = cutscene.isMoving();
@@ -136,34 +180,46 @@ public class Simple2DGame extends ApplicationAdapter {
         } else {
             handleInput();
         }
+    }
 
-
-
-        camera.update();
-        batch.setProjectionMatrix(camera.combined);
-
-        characterCollider.setPosition(characterPosition.x + 50, characterPosition.y - 40);
-
+    /**
+     * Updates the camera's zoom level if necessary, particularly after the cutscene has
+     * finished playing. This method gradually adjusts the zoom level back to a default
+     * value of 1.0 for normal gameplay.
+     *
+     * @param delta the time elapsed since the last frame, used to calculate the incremental zoom adjustment
+     */
+    private void updateCameraZoomIfNeeded(float delta) {
         if (cutsceneFinished && camera.zoom != 1f) {
-            camera.zoom += cutsceneZoomSpeed * Gdx.graphics.getDeltaTime();
+            camera.zoom += CUTSCENE_ZOOM_SPEED * delta;
             if (camera.zoom > 1f) {
                 camera.zoom = 1f;
             }
         }
+    }
 
-        stateTime += Gdx.graphics.getDeltaTime();
-        Gdx.gl.glClearColor(0, 0, 0, 1);
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+    /**
+     * Updates the position of the character's collider based on the current position of the character.
+     */
+    private void updateCharacterCollider() {
+        characterCollider.setPosition(characterPosition.x + 50, characterPosition.y - 40);
+    }
+
+    /**
+     * Renders the main gameplay screen, drawing the background, NPC, player character,
+     * dialogue box, and other visual elements. Also handles certain dynamic elements
+     * like animations and conditional prompts.
+     */
+    private void renderGame() {
         camera.update();
         batch.setProjectionMatrix(camera.combined);
 
-        characterCollider.setPosition(characterPosition.x + 50, characterPosition.y - 40);
-
         batch.begin();
-
         batch.draw(bgTexture, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         batch.draw(groundTexture, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
         npc.render(batch);
+        lightning.draw(batch);
 
         TextureRegion currentFrame = getAnimationFrame();
         batch.draw(currentFrame, characterPosition.x, characterPosition.y - 45, CHARACTER_WIDTH, CHARACTER_HEIGHT);
@@ -176,10 +232,60 @@ public class Simple2DGame extends ApplicationAdapter {
 
         batch.end();
 
-        // Handle dialogue logic outside the batch
         handleDialogue();
-        // show colliders for debugging
-        showColliders();
+
+        if (canPlaySound()) {
+            if (!electricSound.isPlaying()) {
+                electricSound.play();
+            }
+            updateElectricSoundVolume();
+        } else {
+            if (electricSound.isPlaying()) {
+                electricSound.pause();
+            }
+        }
+    }
+
+    /**
+     * Updates the logic for the lightning effect, including its visibility, cooldown, and triggering
+     * logic based on the player's proximity.
+     *
+     * @param delta the time elapsed since the last frame, used to update animations and cooldown timers
+     */
+    private void updateLightningLogic(float delta) {
+        lightning.update(delta);
+
+        float distanceToLightning = characterPosition.dst(900, 70);
+        if (distanceToLightning < 100 && lightningCooldown <= 0f) {
+            lightning.trigger();
+            lightningCooldown = 0.5f;
+        }
+
+        if (lightningCooldown > 0f) {
+            lightningCooldown -= delta;
+        }
+    }
+
+    /**
+     * Updates the electric sound volume based on the character's distance from the lightning.
+     * The closer the character is, the louder the sound (up to maxVolume).
+     */
+    private void updateElectricSoundVolume() {
+        float maxDistance = 300f;  // distance at which sound is barely audible
+        float minDistance = 50f;   // distance at which sound is at maxVolume
+        float maxVolume = 0.7f;
+
+        float distance = characterPosition.dst(lightning.getPosition()); // Assuming lightning has a getPosition()
+
+        if (distance < minDistance) {
+            electricSound.setVolume(maxVolume);
+        } else if (distance > maxDistance) {
+            electricSound.setVolume(0f);
+        } else {
+            // Linear interpolation between min and max distance
+            float volume = maxVolume * (1 - (distance - minDistance) / (maxDistance - minDistance));
+            electricSound.setVolume(volume);
+        }
     }
 
     /**
@@ -214,6 +320,19 @@ public class Simple2DGame extends ApplicationAdapter {
      */
     private boolean canStartDialogue() {
         return npc.getCollider().overlaps(characterCollider) && !inDialogue && !dialogueBox.isVisible() && cutsceneFinished;
+    }
+
+    /**
+     * Determines if a sound can be played based on the current game state and conditions.
+     * This method checks the following conditions:
+     * 1. The player is not in a dialogue.
+     * 2. The cutscene has finished.
+     * 3. The game is in the "GAME" state.
+     *
+     * @return true if all the above conditions are met, indicating that a sound can be played; false otherwise.
+     */
+    private boolean canPlaySound() {
+        return !inDialogue && cutsceneFinished && gameState == GameState.GAME;
     }
 
     /**
@@ -305,6 +424,7 @@ public class Simple2DGame extends ApplicationAdapter {
                 currentDialogueIndex = 0;
                 Texture texture = conversation[currentDialogueIndex].speaker().equals("NPC") ? npcFaceTexture : characterFaceTexture;
                 dialogueBox.startTyping(conversation[currentDialogueIndex], texture);
+                electricSound.stop();
             }
         } else if (inDialogue && Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
             if (dialogueBox.isTyping()) {
@@ -317,6 +437,7 @@ public class Simple2DGame extends ApplicationAdapter {
                 } else {
                     Texture texture = conversation[currentDialogueIndex].speaker().equals("NPC") ? npcFaceTexture : characterFaceTexture;
                     dialogueBox.startTyping(conversation[currentDialogueIndex], texture);
+                    electricSound.stop();
                 }
             }
         }
@@ -324,12 +445,14 @@ public class Simple2DGame extends ApplicationAdapter {
 
     @Override
     public void dispose() {
+        npc.dispose();
         batch.dispose();
         bgTexture.dispose();
+        dialogueBox.dispose();
+        electricSound.dispose();
         groundTexture.dispose();
         shapeRenderer.dispose();
-        npc.dispose();
         characterSheet.dispose();
-        dialogueBox.dispose();
+        lightningTexture.dispose();
     }
 }
